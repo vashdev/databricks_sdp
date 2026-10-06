@@ -1,0 +1,72 @@
+# ==============================================================================
+# Sales Domain Ingestion Specifications (Spoke Config)
+# ==============================================================================
+# This configuration is loaded by the Lakeflow Dynamic Ingestion Engine.
+# Demonstrates:
+#   1. CDC feed with soft/hard deletes (SCD Type 1)
+#   2. Slowly Changing Dimension Type 2 (customer history)
+#   3. High-throughput append-only clickstream telemetry
+# ==============================================================================
+
+domain: sales
+description: "Sales domain data ingestion configurations for orders, customers, and clickstream events."
+
+defaults:
+  source_format: parquet
+  target_catalog: lakehouse_dev
+  target_schema: sales
+  schema_evolution_mode: addNewColumns
+
+tables:
+  # ----------------------------------------------------------------------------
+  # 1. Sales Orders: CDC feed with updates & deletes (SCD Type 1)
+  # ----------------------------------------------------------------------------
+  - table_id: sales_orders
+    target_table_name: orders
+    source_path: "/Volumes/lakehouse_dev/landing/sales/orders/"
+    file_filter_pattern: "*.parquet"
+    ingestion_mode: CDC
+    scd_type: "1"
+    primary_keys:
+      - order_id
+    sequence_by: updated_at
+    delete_condition: 'op_type = "D"'
+    expect_rules:
+      valid_total_amount: "total_amount >= 0.0"
+    expect_or_drop_rules:
+      valid_order_id: "order_id IS NOT NULL"
+    expect_or_fail_rules:
+      valid_order_date: "order_date <= CURRENT_DATE()"
+    is_active: true
+
+  # ----------------------------------------------------------------------------
+  # 2. Sales Customers: Slowly Changing Dimension Type 2 (historical tracking)
+  # ----------------------------------------------------------------------------
+  - table_id: sales_customers
+    target_table_name: customers
+    source_path: "/Volumes/lakehouse_dev/landing/sales/customers/"
+    file_filter_pattern: "*.parquet"
+    ingestion_mode: SCD2
+    scd_type: "2"
+    primary_keys:
+      - customer_id
+    sequence_by: modified_at
+    expect_rules:
+      has_email: "email IS NOT NULL"
+    expect_or_drop_rules:
+      valid_customer_id: "customer_id IS NOT NULL"
+    is_active: true
+
+  # ----------------------------------------------------------------------------
+  # 3. Sales Clickstream: Append-only immutable web telemetry events
+  # ----------------------------------------------------------------------------
+  - table_id: sales_clickstream
+    target_table_name: clickstream
+    source_path: "/Volumes/lakehouse_dev/landing/sales/clickstream/"
+    file_filter_pattern: "*.parquet"
+    ingestion_mode: APPEND
+    expect_rules:
+      valid_session: "session_id IS NOT NULL"
+    expect_or_drop_rules:
+      valid_event_time: "event_timestamp IS NOT NULL"
+    is_active: true

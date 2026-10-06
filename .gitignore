@@ -1,0 +1,24 @@
+# Databricks Asset Bundles
+.databricks/
+.bundle/
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Sample data and logs
+sample_landing_data/
+*.log
+.DS_Store

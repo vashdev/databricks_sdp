@@ -1,0 +1,81 @@
+# ==============================================================================
+# Lakeflow Pipeline Resource Definitions
+# ==============================================================================
+# Each pipeline represents an isolated execution domain (blast-radius boundary).
+# All pipelines execute the SAME shared Python engine (dynamic_ingestion_engine.py),
+# customized via pipeline configuration parameters.
+# ==============================================================================
+
+resources:
+  pipelines:
+    # --------------------------------------------------------------------------
+    # Sales Domain Pipeline
+    # --------------------------------------------------------------------------
+    sales_ingestion_pipeline:
+      name: "[${bundle.target}] Sales Domain Lakeflow Pipeline"
+      target: ${var.catalog}
+      continuous: false # Batch triggered mode (spin down clusters when done)
+      channel: preview  # Latest Lakeflow engine features
+      edition: advanced # Enables Data Quality expectations & CDC apply_changes
+      
+      libraries:
+        - notebook:
+            path: ../pipelines/dynamic_ingestion_engine.py
+        - notebook:
+            path: ../transformations/sales/sales_mart.py
+
+      configuration:
+        pipeline.domain: "sales"
+        pipeline.config_path: "configs/domains/sales.yml"
+        pipeline.catalog: ${var.catalog}
+
+      clusters:
+        - label: default
+          autoscale:
+            min_workers: ${var.min_workers}
+            max_workers: ${var.max_workers}
+            mode: ENHANCED
+
+    # --------------------------------------------------------------------------
+    # Finance Domain Pipeline
+    # --------------------------------------------------------------------------
+    finance_ingestion_pipeline:
+      name: "[${bundle.target}] Finance Domain Lakeflow Pipeline"
+      target: ${var.catalog}
+      continuous: false
+      channel: preview
+      edition: advanced
+      
+      libraries:
+        - notebook:
+            path: ../pipelines/dynamic_ingestion_engine.py
+
+      configuration:
+        pipeline.domain: "finance"
+        pipeline.config_path: "configs/domains/finance.yml"
+        pipeline.catalog: ${var.catalog}
+
+      clusters:
+        - label: default
+          autoscale:
+            min_workers: ${var.min_workers}
+            max_workers: ${var.max_workers}
+            mode: ENHANCED
+
+  # ----------------------------------------------------------------------------
+  # Workflow Trigger (Optional Scheduled Orchestrator)
+  # ----------------------------------------------------------------------------
+  jobs:
+    domain_ingestion_nightly_job:
+      name: "[${bundle.target}] Nightly Domain Ingestion Orchestrator"
+      schedule:
+        quartz_cron_expression: "0 0 2 * * ?" # 02:00 UTC daily
+        timezone_id: "UTC"
+        pause_status: PAUSED # Unpause when ready in production
+      tasks:
+        - task_key: run_sales_pipeline
+          pipeline_task:
+            pipeline_id: ${resources.pipelines.sales_ingestion_pipeline.id}
+        - task_key: run_finance_pipeline
+          pipeline_task:
+            pipeline_id: ${resources.pipelines.finance_ingestion_pipeline.id}

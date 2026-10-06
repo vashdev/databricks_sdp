@@ -1,0 +1,39 @@
+# ==============================================================================
+# Finance Domain Ingestion Specifications (Spoke Config)
+# ==============================================================================
+# Demonstrates:
+#   1. Finance invoices with SCD Type 1 upserts
+#   2. Void invoice deletion logic
+#   3. Strict financial data quality expectations
+# ==============================================================================
+
+domain: finance
+description: "Finance domain data ingestion configurations for accounts receivable and invoices."
+
+defaults:
+  source_format: parquet
+  target_catalog: lakehouse_dev
+  target_schema: finance
+  schema_evolution_mode: addNewColumns
+
+tables:
+  # ----------------------------------------------------------------------------
+  # 1. Finance Invoices: Finance domain with SCD Type 1
+  # ----------------------------------------------------------------------------
+  - table_id: finance_invoices
+    target_table_name: invoices
+    source_path: "/Volumes/lakehouse_dev/landing/finance/invoices/"
+    file_filter_pattern: "*.parquet"
+    ingestion_mode: SCD1
+    scd_type: "1"
+    primary_keys:
+      - invoice_id
+    sequence_by: processed_at
+    delete_condition: 'status = "VOID"'
+    expect_rules:
+      valid_due_date: "due_date >= invoice_date"
+    expect_or_drop_rules:
+      positive_amount: "invoice_amount > 0"
+    expect_or_fail_rules:
+      valid_invoice_id: "invoice_id IS NOT NULL"
+    is_active: true

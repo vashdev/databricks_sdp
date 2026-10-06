@@ -1,0 +1,54 @@
+# ==============================================================================
+# Databricks Asset Bundle (DAB) Configuration
+# ==============================================================================
+bundle:
+  name: lakeflow_ingestion_framework
+
+include:
+  - resources/*.yml
+
+variables:
+  control_table:
+    description: "Full Unity Catalog path to the central ingestion registry"
+    default: "system_metadata.ingestion.table_registry"
+  catalog:
+    description: "Default target catalog for Bronze and Silver tables"
+    default: "lakehouse_dev"
+  min_workers:
+    description: "Minimum cluster worker nodes for pipeline autoscale"
+    default: 1
+  max_workers:
+    description: "Maximum cluster worker nodes for pipeline autoscale"
+    default: 8
+
+targets:
+  dev:
+    mode: development
+    default: true
+    workspace:
+      root_path: /Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.target}
+    variables:
+      catalog: lakehouse_dev
+      control_table: system_metadata.ingestion.table_registry
+      min_workers: 1
+      max_workers: 4
+
+  staging:
+    mode: production
+    workspace:
+      root_path: /Shared/.bundle/${bundle.name}/${bundle.target}
+    variables:
+      catalog: lakehouse_staging
+      control_table: system_metadata.ingestion.table_registry
+      min_workers: 2
+      max_workers: 8
+
+  prod:
+    mode: production
+    workspace:
+      root_path: /Shared/.bundle/${bundle.name}/${bundle.target}
+    variables:
+      catalog: lakehouse_prod
+      control_table: system_metadata.ingestion.table_registry
+      min_workers: 2
+      max_workers: 16
